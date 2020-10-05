@@ -10,19 +10,23 @@ import org.apache.http.auth.AuthenticationException;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
+import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.auth.BasicScheme;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.ssl.SSLContextBuilder;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.http.entity.ContentType.APPLICATION_JSON;
 
 @Log4j2
 public class Migrator {
@@ -45,7 +49,7 @@ public class Migrator {
         return null;
     }
 
-    private static void migrateApplication(JsonNode node, ObjectMapper mapper) throws IOException {
+    private static byte[] migrateApplication(JsonNode node, ObjectMapper mapper) throws IOException {
         ObjectNode root = mapper.createObjectNode();
         ObjectNode clientConfig = mapper.createObjectNode();
         root.put("name", node.get("name").asText());
@@ -81,7 +85,30 @@ public class Migrator {
             clientConfig.set("mapView", mapView);
         }
         root.set("clientConfig", clientConfig);
-        mapper.writeValue(System.out, root);
+        ByteArrayOutputStream bout = new ByteArrayOutputStream();
+        mapper.writeValue(bout, root);
+        return bout.toByteArray();
+    }
+
+    private static void saveApplication(byte[] bs, String url, String user, String password)
+        throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException, IOException {
+        HttpPost post = new HttpPost(url);
+        SSLContextBuilder builder = new SSLContextBuilder();
+        builder.loadTrustMaterial(null, new TrustSelfSignedStrategy());
+        SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(builder.build());
+        try (CloseableHttpClient client = HttpClients.custom().setSSLSocketFactory(sslsf).build()) {
+            UsernamePasswordCredentials credentials = new UsernamePasswordCredentials(user, password);
+            Header header = null;
+            try {
+                header = new BasicScheme(UTF_8).authenticate(credentials, post, null);
+            } catch (AuthenticationException e) {
+                log.error("Error creating authentication: {}", e.getMessage());
+                log.trace("Stack trace:", e);
+            }
+            post.addHeader(header);
+            post.setEntity(new ByteArrayEntity(bs, APPLICATION_JSON));
+            client.execute(post).close();
+        }
     }
 
     private static void migrateApplications(String source, String sourceUser, String sourcePassword,
@@ -111,8 +138,10 @@ public class Migrator {
 
             JsonNode node = mapper.readTree(response.getEntity().getContent());
             for (JsonNode app : node) {
-                migrateApplication(app, mapper);
+                byte[] bs = migrateApplication(app, mapper);
+                saveApplication(bs, target, targetUser, targetPassword);
             }
+            response.close();
         }
     }
 
