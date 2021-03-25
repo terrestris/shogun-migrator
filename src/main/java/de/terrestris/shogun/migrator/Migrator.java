@@ -11,16 +11,19 @@ import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
-import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.conn.ssl.TrustAllStrategy;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.auth.BasicScheme;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.ssl.SSLContextBuilder;
+import org.apache.logging.log4j.core.util.IOUtils;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -49,10 +52,11 @@ public class Migrator {
         return null;
     }
 
-    private static byte[] migrateApplication(JsonNode node, ObjectMapper mapper) throws IOException {
+    public static byte[] migrateApplication(JsonNode node, ObjectMapper mapper) throws IOException {
         ObjectNode root = mapper.createObjectNode();
         ObjectNode clientConfig = mapper.createObjectNode();
         root.put("name", node.get("name").asText());
+        log.info("Migrating application {}", node.get("name").asText());
         JsonNode mapNode = findMapModule(node.get("viewport"));
         if (mapNode != null) {
             JsonNode mapConfig = mapNode.get("mapConfig");
@@ -93,10 +97,11 @@ public class Migrator {
     private static void saveApplication(byte[] bs, String url, String user, String password)
         throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException, IOException {
         HttpPost post = new HttpPost(url);
-        SSLContextBuilder builder = new SSLContextBuilder();
-        builder.loadTrustMaterial(null, new TrustSelfSignedStrategy());
-        SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(builder.build());
-        try (CloseableHttpClient client = HttpClients.custom().setSSLSocketFactory(sslsf).build()) {
+        log.info("Saving application...");
+        try (CloseableHttpClient client = HttpClients.custom()
+            .setSSLContext(new SSLContextBuilder().loadTrustMaterial(null, TrustAllStrategy.INSTANCE).build())
+            .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+            .build()) {
             UsernamePasswordCredentials credentials = new UsernamePasswordCredentials(user, password);
             Header header = null;
             try {
@@ -107,7 +112,9 @@ public class Migrator {
             }
             post.addHeader(header);
             post.setEntity(new ByteArrayEntity(bs, APPLICATION_JSON));
-            client.execute(post).close();
+            CloseableHttpResponse response = client.execute(post);
+            log.info("Response was {}", IOUtils.toString(new InputStreamReader(response.getEntity().getContent(), UTF_8)));
+            response.close();
         }
     }
 
@@ -115,10 +122,10 @@ public class Migrator {
         String target, String targetUser, String targetPassword) throws IOException, KeyStoreException,
         NoSuchAlgorithmException, KeyManagementException {
         ObjectMapper mapper = new ObjectMapper();
-        SSLContextBuilder builder = new SSLContextBuilder();
-        builder.loadTrustMaterial(null, new TrustSelfSignedStrategy());
-        SSLConnectionSocketFactory sslsf = new SSLConnectionSocketFactory(builder.build());
-        try (CloseableHttpClient client = HttpClients.custom().setSSLSocketFactory(sslsf).build()) {
+        try (CloseableHttpClient client = HttpClients.custom()
+            .setSSLContext(new SSLContextBuilder().loadTrustMaterial(null, TrustAllStrategy.INSTANCE).build())
+            .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+            .build()) {
             if (!source.endsWith("/")) {
                 source = source + "/";
             }
@@ -137,7 +144,10 @@ public class Migrator {
             CloseableHttpResponse response = client.execute(get);
 
             JsonNode node = mapper.readTree(response.getEntity().getContent());
+            int i = 0;
             for (JsonNode app : node) {
+                log.info("Loading application...");
+                mapper.writeValue(new File("/tmp/" + ++i + ".json"), app);
                 byte[] bs = migrateApplication(app, mapper);
                 saveApplication(bs, target, targetUser, targetPassword);
             }
