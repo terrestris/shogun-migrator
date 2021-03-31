@@ -17,7 +17,7 @@ public class MigratorTest {
     @ValueSource(strings = {"/1.json", "/2.json", "/3.json"})
     public void testMigration(String file) throws IOException {
         JsonNode node = mapper.readTree(MigratorTest.class.getResource(file));
-        byte[] bs = Migrator.migrateApplication(node, mapper);
+        byte[] bs = Migrator.migrateApplication(node);
         byte[] expected = IOUtils.toByteArray(MigratorTest.class.getResource("/migrated" + file));
 
         Assertions.assertArrayEquals(expected, bs);
