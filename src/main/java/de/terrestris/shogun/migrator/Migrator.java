@@ -21,7 +21,6 @@ import org.apache.http.ssl.SSLContextBuilder;
 import org.apache.logging.log4j.core.util.IOUtils;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.security.KeyManagementException;
@@ -52,7 +51,25 @@ public class Migrator {
         return null;
     }
 
-    public static byte[] migrateApplication(JsonNode node, ObjectMapper mapper) throws IOException {
+    private static JsonNode migrateLayerTree(JsonNode node, ObjectMapper mapper) {
+        ObjectNode folder = mapper.createObjectNode();
+        folder.set("checked", node.get("checked"));
+        folder.set("title", node.get("text"));
+        if (node.has("layer")) {
+            // TODO save layer and use ID
+        }
+        if (node.has("children")) {
+            ArrayNode children = mapper.createArrayNode();
+            folder.set("children", children);
+            for (JsonNode child : node.get("children")) {
+                children.add(migrateLayerTree(child, mapper));
+            }
+        }
+        return folder;
+    }
+
+    public static byte[] migrateApplication(JsonNode node) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
         ObjectNode root = mapper.createObjectNode();
         ObjectNode clientConfig = mapper.createObjectNode();
         root.put("name", node.get("name").asText());
@@ -88,6 +105,8 @@ public class Migrator {
             mapView.set("resolutions", newResolutions);
             clientConfig.set("mapView", mapView);
         }
+        JsonNode layerTree = migrateLayerTree(node.get("layerTree"), mapper);
+        root.set("layerTree", layerTree);
         root.set("clientConfig", clientConfig);
         ByteArrayOutputStream bout = new ByteArrayOutputStream();
         mapper.writeValue(bout, root);
@@ -96,7 +115,7 @@ public class Migrator {
 
     private static void saveApplication(byte[] bs, String url, String user, String password)
         throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException, IOException {
-        HttpPost post = new HttpPost(url);
+        HttpPost post = new HttpPost(url + "applications");
         log.info("Saving application...");
         try (CloseableHttpClient client = HttpClients.custom()
             .setSSLContext(new SSLContextBuilder().loadTrustMaterial(null, TrustAllStrategy.INSTANCE).build())
@@ -119,7 +138,33 @@ public class Migrator {
     }
 
     private static void migrateApplications(String source, String sourceUser, String sourcePassword,
-        String target, String targetUser, String targetPassword) throws IOException, KeyStoreException,
+                                            String target, String targetUser, String targetPassword) throws IOException, KeyStoreException,
+        NoSuchAlgorithmException, KeyManagementException {
+        JsonNode node = fetch(source, sourceUser, sourcePassword, "rest/projectapps");
+        int i = 0;
+        for (JsonNode app : node) {
+            log.info("MIgrating application...");
+            byte[] bs = migrateApplication(app);
+            saveApplication(bs, target, targetUser, targetPassword);
+//                copyInputStreamToFile(new ByteArrayInputStream(bs), new File("/tmp/" + ++i + ".json"));
+        }
+    }
+
+    private static void migrateLayers(String source, String sourceUser, String sourcePassword,
+                                      String target, String targetUser, String targetPassword) throws IOException, KeyStoreException,
+        NoSuchAlgorithmException, KeyManagementException {
+        JsonNode node = fetch(source, sourceUser, sourcePassword, "rest/projectlayers");
+        int i = 0;
+        for (JsonNode layer : node) {
+            log.info("Migrating layer...");
+            // TODO migrate layer
+//            byte[] bs = migrateApplication(app);
+//            saveApplication(bs, target, targetUser, targetPassword);
+//                copyInputStreamToFile(new ByteArrayInputStream(bs), new File("/tmp/" + ++i + ".json"));
+        }
+    }
+
+    private static JsonNode fetch(String source, String sourceUser, String sourcePassword, String resource) throws IOException, KeyStoreException,
         NoSuchAlgorithmException, KeyManagementException {
         ObjectMapper mapper = new ObjectMapper();
         try (CloseableHttpClient client = HttpClients.custom()
@@ -127,9 +172,9 @@ public class Migrator {
             .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
             .build()) {
             if (!source.endsWith("/")) {
-                source = source + "/";
+                source += "/";
             }
-            source = source + "rest/projectapps";
+            source = source + resource;
             HttpGet get = new HttpGet(source);
 
             UsernamePasswordCredentials credentials = new UsernamePasswordCredentials(sourceUser, sourcePassword);
@@ -143,15 +188,7 @@ public class Migrator {
             get.addHeader(header);
             CloseableHttpResponse response = client.execute(get);
 
-            JsonNode node = mapper.readTree(response.getEntity().getContent());
-            int i = 0;
-            for (JsonNode app : node) {
-                log.info("Loading application...");
-                mapper.writeValue(new File("/tmp/" + ++i + ".json"), app);
-                byte[] bs = migrateApplication(app, mapper);
-                saveApplication(bs, target, targetUser, targetPassword);
-            }
-            response.close();
+            return mapper.readTree(response.getEntity().getContent());
         }
     }
 
@@ -163,6 +200,7 @@ public class Migrator {
             String target = args[3];
             String targetUser = args[4];
             String targetPassword = args[5];
+            migrateLayers(source, sourceUser, sourcePassword, target, targetUser, targetPassword);
             migrateApplications(source, sourceUser, sourcePassword, target, targetUser, targetPassword);
         } catch (Exception e) {
             log.error("Error when migrating applications: {}", e.getMessage());
