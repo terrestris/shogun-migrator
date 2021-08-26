@@ -113,6 +113,30 @@ public class Migrator {
         return bout.toByteArray();
     }
 
+    private static void saveLayer(byte[] bs, String url, String user, String password)
+        throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException, IOException {
+        HttpPost post = new HttpPost(url + "layers");
+        log.info("Saving layer...");
+        try (CloseableHttpClient client = HttpClients.custom()
+            .setSSLContext(new SSLContextBuilder().loadTrustMaterial(null, TrustAllStrategy.INSTANCE).build())
+            .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+            .build()) {
+            UsernamePasswordCredentials credentials = new UsernamePasswordCredentials(user, password);
+            Header header = null;
+            try {
+                header = new BasicScheme(UTF_8).authenticate(credentials, post, null);
+            } catch (AuthenticationException e) {
+                log.error("Error creating authentication: {}", e.getMessage());
+                log.trace("Stack trace:", e);
+            }
+            post.addHeader(header);
+            post.setEntity(new ByteArrayEntity(bs, APPLICATION_JSON));
+            CloseableHttpResponse response = client.execute(post);
+            log.info("Response was {}", IOUtils.toString(new InputStreamReader(response.getEntity().getContent(), UTF_8)));
+            response.close();
+        }
+    }
+
     private static void saveApplication(byte[] bs, String url, String user, String password)
         throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException, IOException {
         HttpPost post = new HttpPost(url + "applications");
@@ -143,7 +167,7 @@ public class Migrator {
         JsonNode node = fetch(source, sourceUser, sourcePassword, "rest/projectapps");
         int i = 0;
         for (JsonNode app : node) {
-            log.info("MIgrating application...");
+            log.info("Migrating application...");
             byte[] bs = migrateApplication(app);
             saveApplication(bs, target, targetUser, targetPassword);
 //                copyInputStreamToFile(new ByteArrayInputStream(bs), new File("/tmp/" + ++i + ".json"));
@@ -157,11 +181,112 @@ public class Migrator {
         int i = 0;
         for (JsonNode layer : node) {
             log.info("Migrating layer...");
-            // TODO migrate layer
-//            byte[] bs = migrateApplication(app);
-//            saveApplication(bs, target, targetUser, targetPassword);
-//                copyInputStreamToFile(new ByteArrayInputStream(bs), new File("/tmp/" + ++i + ".json"));
+            byte[] bs = migrateLayer(layer);
+            if (bs == null) {
+                continue;
+            }
+            saveLayer(bs, target, targetUser, targetPassword);
+            // use these to create new test files
+//            new ObjectMapper().writeValue(new File("/tmp/layer" + ++i + ".json"), layer);
+//            copyInputStreamToFile(new ByteArrayInputStream(bs), new File("/tmp/layer" + ++i + ".json"));
         }
+    }
+
+    private static String mapType(String type) {
+        switch (type) {
+            case "TileWMS":
+                return "TILEWMS";
+            case "OSMVectortile":
+                return "VECTORTILE";
+            case "ImageWMS":
+            case "WMSTime":
+                return "WMS";
+            case "WMTS":
+                return "WMTS";
+            // AFAICT these two don't exist yet and might be replaced with the proper value once implemented
+            case "WFS":
+                return "WFS";
+            case "XYZ":
+                return "XYZ";
+            default:
+                log.warn("Unable to migrate layer of type {}.", type);
+                return null;
+        }
+    }
+
+    private static void migrateClientConfig(JsonNode node, ObjectNode config) {
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode appearance = node.get("appearance");
+        config.put("minResolution", appearance.get("minResolution").textValue());
+        config.put("maxResolution", appearance.get("maxResolution").textValue());
+        JsonNode searchable = node.get("searchable");
+        if (searchable != null && searchable.booleanValue()) {
+            config.put("searchable", searchable.booleanValue());
+            JsonNode oldConfig = node.get("searchConfig");
+            ObjectNode searchConfig = mapper.createObjectNode();
+            config.set("searchConfig", searchConfig);
+            searchConfig.put("displayTemplate", oldConfig.get("displayTemplate").textValue());
+            JsonNode icon = oldConfig.get("icon");
+            if (icon != null) {
+                searchConfig.put("icon", icon.textValue());
+            }
+            ArrayNode attributes = mapper.createArrayNode();
+            oldConfig.get("attributes").forEach(attribute -> attributes.add(attribute.textValue()));
+            searchConfig.set("attributes", attributes);
+        } else {
+            config.put("searchable", false);
+        }
+    }
+
+    private static void migrateSourceConfig(JsonNode node, ObjectNode config) {
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode oldSource = node.get("source");
+        config.put("url", oldSource.get("url").textValue());
+        config.put("layerNames", oldSource.get("layerNames").textValue());
+        JsonNode tileGrid = oldSource.get("tileGrid");
+        if (tileGrid != null) {
+            config.put("tileSize", tileGrid.get("tileSize").intValue());
+            JsonNode oldOrigin = tileGrid.get("tileGridOrigin");
+            ArrayNode tileOrigin = mapper.createArrayNode();
+            tileOrigin.add(oldOrigin.get("x").doubleValue());
+            tileOrigin.add(oldOrigin.get("y").doubleValue());
+            config.set("tileOrigin", tileOrigin);
+            JsonNode oldResolutions = tileGrid.get("tileGridResolutions");
+            ArrayNode resolutions = mapper.createArrayNode();
+            oldResolutions.forEach(resolution -> resolutions.add(resolution.doubleValue()));
+            config.set("resolutions", resolutions);
+        }
+    }
+
+    static byte[] migrateLayer(JsonNode node) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode root = mapper.createObjectNode();
+
+        JsonNode name = node.get("name");
+        root.put("name", name.textValue());
+        JsonNode type = node.get("source").get("type");
+        if (type == null) {
+            log.warn("Layer {} doesn't have a type set.", name);
+            return null;
+        }
+        String mappedType = mapType(type.textValue());
+        if (mappedType == null) {
+            return null;
+        }
+        root.put("type", mappedType);
+
+        ObjectNode clientConfig = mapper.createObjectNode();
+        ObjectNode sourceConfig = mapper.createObjectNode();
+
+        migrateClientConfig(node, clientConfig);
+        migrateSourceConfig(node, sourceConfig);
+
+        root.set("clientConfig", clientConfig);
+        root.set("sourceConfig", sourceConfig);
+
+        ByteArrayOutputStream bout = new ByteArrayOutputStream();
+        mapper.writeValue(bout, root);
+        return bout.toByteArray();
     }
 
     private static JsonNode fetch(String source, String sourceUser, String sourcePassword, String resource) throws IOException, KeyStoreException,
