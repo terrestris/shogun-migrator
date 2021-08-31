@@ -26,6 +26,8 @@ import java.io.InputStreamReader;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
+import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.http.entity.ContentType.APPLICATION_JSON;
@@ -51,24 +53,24 @@ public class Migrator {
         return null;
     }
 
-    private static JsonNode migrateLayerTree(JsonNode node, ObjectMapper mapper) {
+    private static JsonNode migrateLayerTree(JsonNode node, ObjectMapper mapper, Map<Integer, Integer> idMap) {
         ObjectNode folder = mapper.createObjectNode();
         folder.set("checked", node.get("checked"));
         folder.set("title", node.get("text"));
         if (node.has("layer")) {
-            // TODO save layer and use ID
+            folder.put("layerId", idMap.get(node.get("layer").get("id").intValue()));
         }
         if (node.has("children")) {
             ArrayNode children = mapper.createArrayNode();
             folder.set("children", children);
             for (JsonNode child : node.get("children")) {
-                children.add(migrateLayerTree(child, mapper));
+                children.add(migrateLayerTree(child, mapper, idMap));
             }
         }
         return folder;
     }
 
-    public static byte[] migrateApplication(JsonNode node) throws IOException {
+    public static byte[] migrateApplication(JsonNode node, Map<Integer, Integer> idMap) throws IOException {
         ObjectMapper mapper = new ObjectMapper();
         ObjectNode root = mapper.createObjectNode();
         ObjectNode clientConfig = mapper.createObjectNode();
@@ -105,7 +107,7 @@ public class Migrator {
             mapView.set("resolutions", newResolutions);
             clientConfig.set("mapView", mapView);
         }
-        JsonNode layerTree = migrateLayerTree(node.get("layerTree"), mapper);
+        JsonNode layerTree = migrateLayerTree(node.get("layerTree"), mapper, idMap);
         root.set("layerTree", layerTree);
         root.set("clientConfig", clientConfig);
         ByteArrayOutputStream bout = new ByteArrayOutputStream();
@@ -113,8 +115,9 @@ public class Migrator {
         return bout.toByteArray();
     }
 
-    private static void saveLayer(byte[] bs, String url, String user, String password)
+    private static int saveLayer(byte[] bs, String url, String user, String password)
         throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException, IOException {
+        ObjectMapper mapper = new ObjectMapper();
         HttpPost post = new HttpPost(url + "layers");
         log.info("Saving layer...");
         try (CloseableHttpClient client = HttpClients.custom()
@@ -132,8 +135,9 @@ public class Migrator {
             post.addHeader(header);
             post.setEntity(new ByteArrayEntity(bs, APPLICATION_JSON));
             CloseableHttpResponse response = client.execute(post);
-            log.info("Response was {}", IOUtils.toString(new InputStreamReader(response.getEntity().getContent(), UTF_8)));
+            JsonNode result = mapper.readTree(response.getEntity().getContent());
             response.close();
+            return result.get("id").intValue();
         }
     }
 
@@ -162,22 +166,23 @@ public class Migrator {
     }
 
     private static void migrateApplications(String source, String sourceUser, String sourcePassword,
-                                            String target, String targetUser, String targetPassword) throws IOException, KeyStoreException,
+                                            String target, String targetUser, String targetPassword, Map<Integer, Integer> idMap) throws IOException, KeyStoreException,
         NoSuchAlgorithmException, KeyManagementException {
         JsonNode node = fetch(source, sourceUser, sourcePassword, "rest/projectapps");
         int i = 0;
         for (JsonNode app : node) {
             log.info("Migrating application...");
-            byte[] bs = migrateApplication(app);
+            byte[] bs = migrateApplication(app, idMap);
             saveApplication(bs, target, targetUser, targetPassword);
-//                copyInputStreamToFile(new ByteArrayInputStream(bs), new File("/tmp/" + ++i + ".json"));
+//            copyInputStreamToFile(new ByteArrayInputStream(bs), new File("/tmp/" + ++i + ".json"));
         }
     }
 
-    private static void migrateLayers(String source, String sourceUser, String sourcePassword,
+    private static Map<Integer, Integer> migrateLayers(String source, String sourceUser, String sourcePassword,
                                       String target, String targetUser, String targetPassword) throws IOException, KeyStoreException,
         NoSuchAlgorithmException, KeyManagementException {
         JsonNode node = fetch(source, sourceUser, sourcePassword, "rest/projectlayers");
+        Map<Integer, Integer> layerIdMap = new HashMap<>();
         int i = 0;
         for (JsonNode layer : node) {
             log.info("Migrating layer...");
@@ -185,11 +190,13 @@ public class Migrator {
             if (bs == null) {
                 continue;
             }
-            saveLayer(bs, target, targetUser, targetPassword);
+            int newId = saveLayer(bs, target, targetUser, targetPassword);
+            layerIdMap.put(layer.get("id").intValue(), newId);
             // use these to create new test files
 //            new ObjectMapper().writeValue(new File("/tmp/layer" + ++i + ".json"), layer);
 //            copyInputStreamToFile(new ByteArrayInputStream(bs), new File("/tmp/layer" + ++i + ".json"));
         }
+        return layerIdMap;
     }
 
     private static String mapType(String type) {
@@ -325,8 +332,8 @@ public class Migrator {
             String target = args[3];
             String targetUser = args[4];
             String targetPassword = args[5];
-            migrateLayers(source, sourceUser, sourcePassword, target, targetUser, targetPassword);
-            migrateApplications(source, sourceUser, sourcePassword, target, targetUser, targetPassword);
+            Map<Integer, Integer> idMap = migrateLayers(source, sourceUser, sourcePassword, target, targetUser, targetPassword);
+            migrateApplications(source, sourceUser, sourcePassword, target, targetUser, targetPassword, idMap);
         } catch (Exception e) {
             log.error("Error when migrating applications: {}", e.getMessage());
             log.trace("Stack trace:", e);
