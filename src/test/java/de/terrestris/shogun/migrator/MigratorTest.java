@@ -7,7 +7,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
+
+import static org.apache.commons.io.FileUtils.copyInputStreamToFile;
 
 public class MigratorTest {
 
@@ -17,9 +22,17 @@ public class MigratorTest {
     @ValueSource(strings = {"/1.json", "/2.json", "/3.json"})
     public void testMigration(String file) throws IOException {
         JsonNode node = mapper.readTree(MigratorTest.class.getResource(file));
-        byte[] bs = Migrator.migrateApplication(node, mapper);
+        byte[] bs = Migrator.migrateApplication(node, new HashMap<>());
         byte[] expected = IOUtils.toByteArray(MigratorTest.class.getResource("/migrated" + file));
+        Assertions.assertArrayEquals(expected, bs);
+    }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"/layer1.json", "/layer2.json", "/layer3.json", "/layer4.json", "/layer5.json", "/layer6.json", "/layer7.json", "/layer8.json"})
+    public void testLayerMigration(String file) throws IOException {
+        JsonNode node = mapper.readTree(MigratorTest.class.getResource(file));
+        byte[] bs = Migrator.migrateLayer(node);
+        byte[] expected = IOUtils.toByteArray(MigratorTest.class.getResource("/migratedlayer" + file));
         Assertions.assertArrayEquals(expected, bs);
     }
 
