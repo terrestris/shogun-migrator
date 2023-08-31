@@ -17,13 +17,17 @@ import static de.terrestris.shogun.migrator.util.ApiUtil.*;
 @Log4j2
 public class BootMigrator implements ShogunMigrator {
 
+  public static final String LAYER_ID = "layerId";
+
+  public static final String BACKGROUND_LAYERS = "backgroundLayers";
+
   private HostDto source;
 
   private HostDto target;
 
   private static void migrateLayerTree(ObjectNode node, Map<Integer, Integer> idMap) {
-    if (node.has("layerId")) {
-      node.put("layerId", idMap.get(node.get("layerId").intValue()));
+    if (node.has(LAYER_ID)) {
+      node.put(LAYER_ID, idMap.get(node.get(LAYER_ID).intValue()));
     }
     if (node.has("children")) {
       for (JsonNode jsonNode : node.get("children")) {
@@ -38,12 +42,12 @@ public class BootMigrator implements ShogunMigrator {
     log.info("Migrating application {}", node.get("name").asText());
 
     JsonNode clientConfig = node.get("clientConfig");
-    if (clientConfig.has("backgroundLayers")) {
+    if (clientConfig.has(BACKGROUND_LAYERS)) {
       ArrayNode backgroundLayers = mapper.createArrayNode();
-      for (JsonNode jsonNode : clientConfig.get("backgroundLayers")) {
+      for (JsonNode jsonNode : clientConfig.get(BACKGROUND_LAYERS)) {
         backgroundLayers.add(idMap.get(jsonNode.asInt()));
       }
-      ((ObjectNode) clientConfig).set("backgroundLayers", backgroundLayers);
+      ((ObjectNode) clientConfig).set(BACKGROUND_LAYERS, backgroundLayers);
     }
     JsonNode layerTree = node.get("layerTree");
     migrateLayerTree((ObjectNode) layerTree, idMap);

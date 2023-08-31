@@ -18,10 +18,8 @@ import org.apache.http.impl.auth.BasicScheme;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.ssl.SSLContextBuilder;
-import org.apache.logging.log4j.core.util.IOUtils;
 
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -31,6 +29,10 @@ import static org.apache.http.entity.ContentType.APPLICATION_JSON;
 
 @Log4j2
 public class ApiUtil {
+
+  private ApiUtil() {
+    // prevent instantiation
+  }
 
   public static JsonNode fetch(HostDto host, String resource) throws IOException, KeyStoreException,
     NoSuchAlgorithmException, KeyManagementException {
@@ -81,11 +83,10 @@ public class ApiUtil {
     }
   }
 
-  public static int saveLayer(byte[] bs, HostDto host)
-    throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException, IOException {
+  private static JsonNode saveEntity(HostDto host, byte[] bs, String entity) throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException, IOException {
     ObjectMapper mapper = new ObjectMapper();
-    HttpPost post = new HttpPost(host.getHostname() + "layers");
-    log.info("Saving layer...");
+    HttpPost post = new HttpPost(host.getHostname() + entity + "s");
+    log.info("Saving {}...", entity);
     try (CloseableHttpClient client = HttpClients.custom()
       .setSSLContext(new SSLContextBuilder().loadTrustMaterial(null, TrustAllStrategy.INSTANCE).build())
       .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
@@ -100,35 +101,21 @@ public class ApiUtil {
       }
       post.addHeader(header);
       post.setEntity(new ByteArrayEntity(bs, APPLICATION_JSON));
-      CloseableHttpResponse response = client.execute(post);
-      JsonNode result = mapper.readTree(response.getEntity().getContent());
-      response.close();
-      return result.get("id").intValue();
+      try (CloseableHttpResponse response = client.execute(post)) {
+        return mapper.readTree(response.getEntity().getContent());
+      }
     }
+  }
+
+  public static int saveLayer(byte[] bs, HostDto host)
+    throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException, IOException {
+    JsonNode result = saveEntity(host, bs, "layer");
+    return result.get("id").intValue();
   }
 
   public static void saveApplication(byte[] bs, HostDto host)
     throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException, IOException {
-    HttpPost post = new HttpPost(host.getHostname() + "applications");
-    log.info("Saving application...");
-    try (CloseableHttpClient client = HttpClients.custom()
-      .setSSLContext(new SSLContextBuilder().loadTrustMaterial(null, TrustAllStrategy.INSTANCE).build())
-      .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
-      .build()) {
-      UsernamePasswordCredentials credentials = new UsernamePasswordCredentials(host.getUsername(), host.getPassword());
-      Header header = null;
-      try {
-        header = new BasicScheme(UTF_8).authenticate(credentials, post, null);
-      } catch (AuthenticationException e) {
-        log.error("Error creating authentication: {}", e.getMessage());
-        log.trace("Stack trace:", e);
-      }
-      post.addHeader(header);
-      post.setEntity(new ByteArrayEntity(bs, APPLICATION_JSON));
-      CloseableHttpResponse response = client.execute(post);
-      log.info("Response was {}", IOUtils.toString(new InputStreamReader(response.getEntity().getContent(), UTF_8)));
-      response.close();
-    }
+    saveEntity(host, bs, "application");
   }
 
 }
