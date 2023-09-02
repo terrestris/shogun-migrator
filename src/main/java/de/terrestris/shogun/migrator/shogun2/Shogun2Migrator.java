@@ -19,6 +19,9 @@ import static de.terrestris.shogun.migrator.util.ApiUtil.*;
 @Log4j2
 public class Shogun2Migrator implements ShogunMigrator {
 
+  public static final String CHILDREN = "children";
+  public static final String RESOLUTIONS = "resolutions";
+  public static final String SEARCHABLE = "searchable";
   private HostDto source;
 
   private HostDto target;
@@ -55,10 +58,10 @@ public class Shogun2Migrator implements ShogunMigrator {
       }
       folder.put("layerId", idMap.get(id));
     }
-    if (node.has("children")) {
+    if (node.has(CHILDREN)) {
       ArrayNode children = mapper.createArrayNode();
-      folder.set("children", children);
-      for (JsonNode child : node.get("children")) {
+      folder.set(CHILDREN, children);
+      for (JsonNode child : node.get(CHILDREN)) {
         children.add(migrateLayerTree(child, mapper, idMap));
       }
     }
@@ -94,12 +97,12 @@ public class Shogun2Migrator implements ShogunMigrator {
       mapView.set("mapExtent", extent);
       String oldProjection = mapConfig.get("projection").asText();
       mapView.put("projection", oldProjection.startsWith("EPSG:") ? oldProjection : ("EPSG:" + oldProjection));
-      JsonNode resolutions = mapConfig.get("resolutions");
+      JsonNode resolutions = mapConfig.get(RESOLUTIONS);
       ArrayNode newResolutions = mapper.createArrayNode();
       for (JsonNode res : resolutions) {
         newResolutions.add(res.asDouble());
       }
-      mapView.set("resolutions", newResolutions);
+      mapView.set(RESOLUTIONS, newResolutions);
       clientConfig.set("mapView", mapView);
     }
     JsonNode layerTree = migrateLayerTree(node.get("layerTree"), mapper, idMap);
@@ -137,9 +140,9 @@ public class Shogun2Migrator implements ShogunMigrator {
     JsonNode appearance = node.get("appearance");
     config.put("minResolution", appearance.get("minResolution").textValue());
     config.put("maxResolution", appearance.get("maxResolution").textValue());
-    JsonNode searchable = node.get("searchable");
+    JsonNode searchable = node.get(SEARCHABLE);
     if (searchable != null && searchable.booleanValue()) {
-      config.put("searchable", searchable.booleanValue());
+      config.put(SEARCHABLE, searchable.booleanValue());
       JsonNode oldConfig = node.get("searchConfig");
       ObjectNode searchConfig = mapper.createObjectNode();
       config.set("searchConfig", searchConfig);
@@ -152,7 +155,7 @@ public class Shogun2Migrator implements ShogunMigrator {
       oldConfig.get("attributes").forEach(attribute -> attributes.add(attribute.textValue()));
       searchConfig.set("attributes", attributes);
     } else {
-      config.put("searchable", false);
+      config.put(SEARCHABLE, false);
     }
   }
 
@@ -172,7 +175,7 @@ public class Shogun2Migrator implements ShogunMigrator {
       JsonNode oldResolutions = tileGrid.get("tileGridResolutions");
       ArrayNode resolutions = mapper.createArrayNode();
       oldResolutions.forEach(resolution -> resolutions.add(resolution.doubleValue()));
-      config.set("resolutions", resolutions);
+      config.set(RESOLUTIONS, resolutions);
     }
   }
 
@@ -218,7 +221,7 @@ public class Shogun2Migrator implements ShogunMigrator {
     try {
       JsonNode node = fetch(source, "rest/projectlayers");
       Map<Integer, Integer> layerIdMap = new HashMap<>();
-      int i = 0;
+//      int i = 0;
       for (JsonNode layer : node) {
         log.info("Migrating layer...");
         byte[] bs = migrateLayer(layer);
@@ -243,7 +246,7 @@ public class Shogun2Migrator implements ShogunMigrator {
   public void migrateApplications(Map<Integer, Integer> idMap) {
     try {
       JsonNode node = fetch(source, "rest/projectapps");
-      int i = 0;
+//      int i = 0;
       for (JsonNode app : node) {
         log.info("Migrating application...");
         byte[] bs = migrateApplication(app, idMap);

@@ -11,13 +11,13 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.io.IOException;
 import java.util.HashMap;
 
-public class MigratorTest {
+class MigratorTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
     @ParameterizedTest
     @ValueSource(strings = {"/1.json", "/2.json", "/3.json"})
-    public void testMigration(String file) throws IOException {
+    void testMigration(String file) throws IOException {
         JsonNode node = mapper.readTree(MigratorTest.class.getResource(file));
         byte[] bs = Shogun2Migrator.migrateApplication(node, new HashMap<>());
         byte[] expected = IOUtils.toByteArray(MigratorTest.class.getResource("/migrated" + file));
@@ -26,7 +26,7 @@ public class MigratorTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"/layer1.json", "/layer2.json", "/layer3.json", "/layer4.json", "/layer5.json", "/layer6.json", "/layer7.json", "/layer8.json"})
-    public void testLayerMigration(String file) throws IOException {
+    void testLayerMigration(String file) throws IOException {
         JsonNode node = mapper.readTree(MigratorTest.class.getResource(file));
         byte[] bs = Shogun2Migrator.migrateLayer(node);
         byte[] expected = IOUtils.toByteArray(MigratorTest.class.getResource("/migratedlayer" + file));
