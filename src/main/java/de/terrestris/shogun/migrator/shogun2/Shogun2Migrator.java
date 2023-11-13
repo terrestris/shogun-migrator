@@ -8,6 +8,7 @@ import de.terrestris.shogun.migrator.model.HostDto;
 import de.terrestris.shogun.migrator.spi.ShogunMigrator;
 import de.terrestris.shogun.migrator.util.MigrationException;
 import lombok.extern.log4j.Log4j2;
+import org.kohsuke.MetaInfServices;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -17,6 +18,7 @@ import java.util.Map;
 import static de.terrestris.shogun.migrator.util.ApiUtil.*;
 
 @Log4j2
+@MetaInfServices
 public class Shogun2Migrator implements ShogunMigrator {
 
   public static final String CHILDREN = "children";
