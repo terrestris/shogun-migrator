@@ -3,6 +3,7 @@ package de.terrestris.shogun.migrator.util;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.terrestris.shogun.migrator.model.HostDto;
+import de.terrestris.shogun.migrator.spi.LayerPostProcessor;
 import lombok.extern.log4j.Log4j2;
 import org.apache.http.Header;
 import org.apache.http.auth.AuthenticationException;
@@ -26,6 +27,7 @@ import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
+import java.util.ServiceLoader;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.http.entity.ContentType.APPLICATION_JSON;
@@ -35,6 +37,13 @@ public class ApiUtil {
 
   private ApiUtil() {
     // prevent instantiation
+  }
+
+  private static final List<LayerPostProcessor> LAYER_POSTPROCESSORS;
+
+  static {
+    ServiceLoader<LayerPostProcessor> loader = ServiceLoader.load(LayerPostProcessor.class);
+    LAYER_POSTPROCESSORS = loader.stream().map(ServiceLoader.Provider::get).toList();
   }
 
   public static void getToken(HostDto host) throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException, IOException {
@@ -131,6 +140,12 @@ public class ApiUtil {
 
   public static int saveLayer(byte[] bs, HostDto host)
     throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException, IOException {
+    ObjectMapper mapper = new ObjectMapper();
+    JsonNode node = mapper.readTree(bs);
+    LAYER_POSTPROCESSORS.forEach(processor -> {
+      processor.postprocess(node);
+    });
+    bs = mapper.writeValueAsBytes(node);
     JsonNode result = saveEntity(host, bs, "layer");
     return result.get("id").intValue();
   }
