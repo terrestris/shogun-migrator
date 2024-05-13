@@ -7,6 +7,7 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.http.Header;
 import org.apache.http.auth.AuthenticationException;
 import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
@@ -17,12 +18,14 @@ import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.auth.BasicScheme;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.ssl.SSLContextBuilder;
 
 import java.io.IOException;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.http.entity.ContentType.APPLICATION_JSON;
@@ -34,7 +37,35 @@ public class ApiUtil {
     // prevent instantiation
   }
 
-  public static JsonNode fetch(HostDto host, String resource) throws IOException, KeyStoreException,
+  public static void getToken(HostDto host) throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException, IOException {
+    if (host.getClientId() == null) {
+      return;
+    }
+    ObjectMapper mapper = new ObjectMapper();
+    String url = String.format("%sauth/realms/SHOGun/protocol/openid-connect/token", host.getHostname());
+    try (CloseableHttpClient client = HttpClients.custom()
+      .setSSLContext(new SSLContextBuilder().loadTrustMaterial(null, TrustAllStrategy.INSTANCE).build())
+      .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+      .build()) {
+      HttpPost post = new HttpPost(url);
+      log.debug("Fetching token.");
+
+      UrlEncodedFormEntity entity = new UrlEncodedFormEntity(List.of(
+        new BasicNameValuePair("username", host.getUsername()),
+        new BasicNameValuePair("password", host.getPassword()),
+        new BasicNameValuePair("grant_type", "password"),
+        new BasicNameValuePair("client_id", host.getClientId())
+      ));
+      post.setEntity(entity);
+      post.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+      CloseableHttpResponse response = client.execute(post);
+
+      host.setToken(mapper.readTree(response.getEntity().getContent()).get("access_token").asText());
+    }
+  }
+
+  public static JsonNode fetch(HostDto host, String resource, boolean isBoot) throws IOException, KeyStoreException,
     NoSuchAlgorithmException, KeyManagementException {
     ObjectMapper mapper = new ObjectMapper();
     String source = host.getHostname();
@@ -44,17 +75,23 @@ public class ApiUtil {
       .build()) {
       source = source + resource;
       HttpGet get = new HttpGet(source);
+      log.debug("Fetching: {}", get.toString());
 
-      UsernamePasswordCredentials credentials = new UsernamePasswordCredentials(host.getUsername(), host.getPassword());
-      Header header = null;
-      try {
-        header = new BasicScheme(UTF_8).authenticate(credentials, get, null);
-      } catch (AuthenticationException e) {
-        log.error("Error creating authentication: {}", e.getMessage());
-        log.trace("Stack trace:", e);
+      if (isBoot) {
+        get.addHeader("Authorization", "Bearer " + host.getToken());
+      } else {
+        UsernamePasswordCredentials credentials = new UsernamePasswordCredentials(host.getUsername(), host.getPassword());
+        Header header = null;
+        try {
+          header = new BasicScheme(UTF_8).authenticate(credentials, get, null);
+        } catch (AuthenticationException e) {
+          log.error("Error creating authentication: {}", e.getMessage());
+          log.trace("Stack trace:", e);
+        }
+        get.addHeader(header);
       }
-      get.addHeader(header);
       CloseableHttpResponse response = client.execute(get);
+      log.debug("Status code: {}", response.getStatusLine().getStatusCode());
 
       return mapper.readTree(response.getEntity().getContent());
     }
@@ -69,17 +106,10 @@ public class ApiUtil {
       .build()) {
       source = source + resource;
       HttpDelete delete = new HttpDelete(source);
-
-      UsernamePasswordCredentials credentials = new UsernamePasswordCredentials(host.getUsername(), host.getPassword());
-      Header header = null;
-      try {
-        header = new BasicScheme(UTF_8).authenticate(credentials, delete, null);
-      } catch (AuthenticationException e) {
-        log.error("Error creating authentication: {}", e.getMessage());
-        log.trace("Stack trace:", e);
-      }
-      delete.addHeader(header);
-      client.execute(delete).close();
+      delete.addHeader("Authorization", "Bearer " + host.getToken());
+      CloseableHttpResponse response = client.execute(delete);
+      log.trace("Status code: {}", response.getStatusLine().getStatusCode());
+      response.close();
     }
   }
 
@@ -91,15 +121,7 @@ public class ApiUtil {
       .setSSLContext(new SSLContextBuilder().loadTrustMaterial(null, TrustAllStrategy.INSTANCE).build())
       .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
       .build()) {
-      UsernamePasswordCredentials credentials = new UsernamePasswordCredentials(host.getUsername(), host.getPassword());
-      Header header = null;
-      try {
-        header = new BasicScheme(UTF_8).authenticate(credentials, post, null);
-      } catch (AuthenticationException e) {
-        log.error("Error creating authentication: {}", e.getMessage());
-        log.trace("Stack trace:", e);
-      }
-      post.addHeader(header);
+      post.addHeader("Authorization", "Bearer " + host.getToken());
       post.setEntity(new ByteArrayEntity(bs, APPLICATION_JSON));
       try (CloseableHttpResponse response = client.execute(post)) {
         return mapper.readTree(response.getEntity().getContent());
