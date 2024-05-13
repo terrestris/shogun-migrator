@@ -15,8 +15,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ServiceLoader;
 import java.util.concurrent.Callable;
 
-import static de.terrestris.shogun.migrator.util.ApiUtil.delete;
-import static de.terrestris.shogun.migrator.util.ApiUtil.fetch;
+import static de.terrestris.shogun.migrator.util.ApiUtil.*;
 
 @Log4j2
 @Command(name = "SHOGun-Migrator", version = "0.0.1", mixinStandardHelpOptions = true)
@@ -58,6 +57,12 @@ public class Migrator implements Callable<Boolean> {
   private String sourcePassword;
 
   @Option(
+    names = {"-sc", "--source-client"},
+    description = "the source client id"
+  )
+  private String sourceClient;
+
+  @Option(
     names = {"-th", "--target-host"},
     required = true,
     description = "the target API endpoint, e.g. https://my-shogun-boot.com/"
@@ -78,6 +83,13 @@ public class Migrator implements Callable<Boolean> {
   )
   private String targetPassword;
 
+  @Option(
+    names = {"-tc", "--target-client"},
+    required = true,
+    description = "the target client id"
+  )
+  private String targetClient;
+
   private static ShogunMigrator getMigrator(Type type) {
     ServiceLoader<ShogunMigrator> loader = ServiceLoader.load(ShogunMigrator.class);
     for (ShogunMigrator migrator : loader) {
@@ -89,11 +101,11 @@ public class Migrator implements Callable<Boolean> {
   }
 
   private void clear(HostDto target) throws IOException, KeyStoreException, NoSuchAlgorithmException, KeyManagementException {
-    JsonNode node = fetch(target, "applications");
+    JsonNode node = fetch(target, "applications", true).get("content");
     for (JsonNode app : node) {
       delete(target, String.format("applications/%s", app.get("id").asInt()));
     }
-    node = fetch(target, "layers");
+    node = fetch(target, "layers", true).get("content");
     for (JsonNode app : node) {
       delete(target, String.format("layers/%s", app.get("id").asInt()));
     }
@@ -105,10 +117,14 @@ public class Migrator implements Callable<Boolean> {
     if (!source.getHostname().endsWith("/")) {
       source.setHostname(source.getHostname() + "/");
     }
+    source.setClientId(sourceClient);
+    getToken(source);
     HostDto target = new HostDto(targetHost, targetUser, targetPassword);
     if (!target.getHostname().endsWith("/")) {
       target.setHostname(target.getHostname() + "/");
     }
+    target.setClientId(targetClient);
+    getToken(target);
     ShogunMigrator migrator = getMigrator(type);
     if (migrator == null) {
       log.error("Unable to find migrator for type {}, exiting.", type);

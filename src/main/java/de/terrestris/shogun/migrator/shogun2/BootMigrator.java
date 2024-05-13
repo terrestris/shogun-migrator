@@ -67,7 +67,7 @@ public class BootMigrator implements ShogunMigrator {
   public Map<Integer, Integer> migrateLayers() {
     ObjectMapper mapper = new ObjectMapper();
     try {
-      JsonNode node = fetch(source, "layers");
+      JsonNode node = fetch(source, "layers", true);
       Map<Integer, Integer> layerIdMap = new HashMap<>();
       for (JsonNode layer : node) {
         int id = layer.get("id").intValue();
@@ -93,7 +93,7 @@ public class BootMigrator implements ShogunMigrator {
   @Override
   public void migrateApplications(Map<Integer, Integer> idMap) {
     try {
-      JsonNode node = fetch(source, "applications");
+      JsonNode node = fetch(source, "applications", true);
       for (JsonNode app : node) {
         log.info("Migrating application...");
         byte[] bs = migrateApplication((ObjectNode) app, idMap);

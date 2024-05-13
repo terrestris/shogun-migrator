@@ -142,6 +142,23 @@ public class Shogun2Migrator implements ShogunMigrator {
     JsonNode appearance = node.get("appearance");
     config.put("minResolution", appearance.get("minResolution").textValue());
     config.put("maxResolution", appearance.get("maxResolution").textValue());
+    config.put("hoverable", appearance.get("hoverable").booleanValue());
+    JsonNode propertyConfig = node.get("columnAliasesDe");
+    if (propertyConfig != null) {
+      ArrayNode formConfig = mapper.createArrayNode();
+      config.set("featureInfoFormConfig", formConfig);
+      ObjectNode properties = mapper.createObjectNode();
+      formConfig.add(properties);
+      properties.put("title", node.get("name").asText());
+      ArrayNode list = mapper.createArrayNode();
+      properties.set("children", list);
+      propertyConfig.fieldNames().forEachRemaining(name -> {
+        ObjectNode property = mapper.createObjectNode();
+        property.put("propertyName", name);
+        property.put("displayName", propertyConfig.get(name).asText());
+        list.add(property);
+      });
+    }
     JsonNode searchable = node.get(SEARCHABLE);
     if (searchable != null && searchable.booleanValue()) {
       config.put(SEARCHABLE, searchable.booleanValue());
@@ -162,9 +179,19 @@ public class Shogun2Migrator implements ShogunMigrator {
   }
 
   private static void migrateSourceConfig(JsonNode node, ObjectNode config) {
+    config.put("attribution", node.get("appearance").get("attribution").textValue());
+    JsonNode legendUrl = node.get("legendUrl");
+    if (legendUrl != null) {
+      config.put("legendUrl", legendUrl.asText());
+    }
     ObjectMapper mapper = new ObjectMapper();
     JsonNode oldSource = node.get("source");
-    config.put("url", oldSource.get("url").textValue());
+    String url = oldSource.get("url").textValue();
+    if (url.startsWith("http")) {
+      config.put("url", url);
+    } else {
+      config.put("url", "/geoserver/ows");
+    }
     config.put("layerNames", oldSource.get("layerNames").textValue());
     JsonNode tileGrid = oldSource.get("tileGrid");
     if (tileGrid != null) {
@@ -221,7 +248,7 @@ public class Shogun2Migrator implements ShogunMigrator {
   @Override
   public Map<Integer, Integer> migrateLayers() {
     try {
-      JsonNode node = fetch(source, "rest/projectlayers");
+      JsonNode node = fetch(source, "rest/projectlayers", false);
       Map<Integer, Integer> layerIdMap = new HashMap<>();
 //      int i = 0;
       for (JsonNode layer : node) {
@@ -233,8 +260,10 @@ public class Shogun2Migrator implements ShogunMigrator {
         int newId = saveLayer(bs, target);
         layerIdMap.put(layer.get("id").intValue(), newId);
         // use these to create new test files
-//            new ObjectMapper().writeValue(new File("/tmp/layer" + ++i + ".json"), layer);
-//            copyInputStreamToFile(new ByteArrayInputStream(bs), new File("/tmp/layer" + ++i + ".json"));
+//        new ObjectMapper().writeValue(new File("/tmp/layer" + ++i + ".json"), layer);
+//        OutputStream outputStream = Files.newOutputStream(new File("/tmp/layer" + ++i + ".json").toPath());
+//        copy(new ByteArrayInputStream(bs), outputStream);
+//        outputStream.close();
       }
       return layerIdMap;
     } catch (Exception e) {
@@ -247,13 +276,16 @@ public class Shogun2Migrator implements ShogunMigrator {
   @Override
   public void migrateApplications(Map<Integer, Integer> idMap) {
     try {
-      JsonNode node = fetch(source, "rest/projectapps");
+      JsonNode node = fetch(source, "rest/projectapps", false);
 //      int i = 0;
       for (JsonNode app : node) {
         log.info("Migrating application...");
         byte[] bs = migrateApplication(app, idMap);
         saveApplication(bs, target);
-//            copyInputStreamToFile(new ByteArrayInputStream(bs), new File("/tmp/" + ++i + ".json"));
+        // use these to create new test files
+//        OutputStream outputStream = Files.newOutputStream(new File("/tmp/" + ++i + ".json").toPath());
+//        copy(new ByteArrayInputStream(bs), outputStream);
+//        outputStream.close();
       }
     } catch (Exception e) {
       log.warn("Unable to migrate applications: {}", e.getMessage());
