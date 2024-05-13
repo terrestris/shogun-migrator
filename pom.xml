@@ -9,6 +9,13 @@
   <version>0.0.1-SNAPSHOT</version>
   <packaging>jar</packaging>
 
+  <scm>
+    <url>https://github.com/terrestris/shogun-migrator</url>
+    <connection>scm:git:git@github.com:terrestris/shogun-migrator.git</connection>
+    <developerConnection>scm:git:git@github.com:terrestris/shogun-migrator.git</developerConnection>
+    <tag>HEAD</tag>
+  </scm>
+
   <repositories>
     <repository>
       <id>nexus.terrestris.de</id>
