@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.terrestris.shogun.migrator.shogun2.Shogun2Migrator;
 import org.apache.commons.io.IOUtils;
+import org.geotools.api.referencing.FactoryException;
+import org.geotools.api.referencing.operation.TransformException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -17,7 +19,7 @@ class MigratorTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"/1.json", "/2.json", "/3.json"})
-    void testMigration(String file) throws IOException {
+    void testMigration(String file) throws IOException, FactoryException, TransformException {
         JsonNode node = mapper.readTree(MigratorTest.class.getResource(file));
         byte[] bs = Shogun2Migrator.migrateApplication(node, new HashMap<>());
         byte[] expected = IOUtils.toByteArray(MigratorTest.class.getResource("/migrated" + file));

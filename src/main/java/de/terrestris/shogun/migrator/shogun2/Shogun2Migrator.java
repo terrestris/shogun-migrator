@@ -8,6 +8,13 @@ import de.terrestris.shogun.migrator.model.HostDto;
 import de.terrestris.shogun.migrator.spi.ShogunMigrator;
 import de.terrestris.shogun.migrator.util.MigrationException;
 import lombok.extern.log4j.Log4j2;
+import org.geotools.api.geometry.Position;
+import org.geotools.api.referencing.FactoryException;
+import org.geotools.api.referencing.crs.CoordinateReferenceSystem;
+import org.geotools.api.referencing.operation.MathTransform;
+import org.geotools.api.referencing.operation.TransformException;
+import org.geotools.geometry.Position2D;
+import org.geotools.referencing.CRS;
 import org.kohsuke.MetaInfServices;
 
 import java.io.ByteArrayOutputStream;
@@ -70,7 +77,7 @@ public class Shogun2Migrator implements ShogunMigrator {
     return folder;
   }
 
-  public static byte[] migrateApplication(JsonNode node, Map<Integer, Integer> idMap) throws IOException {
+  public static byte[] migrateApplication(JsonNode node, Map<Integer, Integer> idMap) throws IOException, FactoryException, TransformException {
     ObjectMapper mapper = new ObjectMapper();
     ObjectNode root = mapper.createObjectNode();
     ObjectNode clientConfig = mapper.createObjectNode();
@@ -96,9 +103,20 @@ public class Shogun2Migrator implements ShogunMigrator {
       extent.add(oldExtent.get("lowerLeft").get("y").asDouble());
       extent.add(oldExtent.get("upperRight").get("x").asDouble());
       extent.add(oldExtent.get("upperRight").get("y").asDouble());
-      mapView.set("mapExtent", extent);
+      mapView.set("extent", extent);
+      mapView.put("zoom", mapConfig.get("zoom").asInt());
       String oldProjection = mapConfig.get("projection").asText();
       mapView.put("projection", oldProjection.startsWith("EPSG:") ? oldProjection : ("EPSG:" + oldProjection));
+
+      CoordinateReferenceSystem targetCrs = CRS.decode("EPSG:4326");
+      CoordinateReferenceSystem sourceCrs = CRS.decode(mapView.get("projection").asText());
+      MathTransform transform = CRS.findMathTransform(sourceCrs, targetCrs);
+      Position pos = new Position2D(center.get(0).asDouble(), center.get(1).asDouble());
+      Position transformed = transform.transform(pos, null);
+      center.removeAll();
+      center.add(transformed.getOrdinate(1));
+      center.add(transformed.getOrdinate(0));
+
       JsonNode resolutions = mapConfig.get(RESOLUTIONS);
       ArrayNode newResolutions = mapper.createArrayNode();
       for (JsonNode res : resolutions) {
