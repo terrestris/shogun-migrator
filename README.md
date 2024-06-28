@@ -12,3 +12,16 @@ your jar).
 You can run the application directly or in an IDE. Run with `-h` to get help:
 
 `java -jar shogun-migrator-0.0.1-SNAPSHOT-jar-with-dependencies.jar -h`
+
+## Command line options
+
+| Parameter | Description                   |
+|-----------|-------------------------------|
+| `sh`      | Source host                   |
+| `su`      | Source user                   |
+| `sp`      | Source password               |
+| `th`      | Target host                   |
+| `tu`      | Target user                   |
+| `tp`      | Target password               |
+| `tc`      | Target client                 |
+| `c`       | Clear (override existing data)|
