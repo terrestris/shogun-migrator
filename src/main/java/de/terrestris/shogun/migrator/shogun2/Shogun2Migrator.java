@@ -19,8 +19,7 @@ import org.kohsuke.MetaInfServices;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import static de.terrestris.shogun.migrator.util.ApiUtil.*;
 
@@ -134,28 +133,22 @@ public class Shogun2Migrator implements ShogunMigrator {
   }
 
   private static String mapType(String type) {
-    switch (type) {
-      case "TileWMS":
-        return "TILEWMS";
-      case "OSMVectortile":
-        return "VECTORTILE";
-      case "ImageWMS":
-      case "WMSTime":
-        return "WMS";
-      case "WMTS":
-        return "WMTS";
-      // AFAICT these two don't exist yet and might be replaced with the proper value once implemented
-      case "WFS":
-        return "WFS";
-      case "XYZ":
-        return "XYZ";
-      default:
-        log.warn("Unable to migrate layer of type {}.", type);
-        return null;
-    }
+      return switch (type) {
+          case "TileWMS" -> "TILEWMS";
+          case "OSMVectortile" -> "VECTORTILE";
+          case "ImageWMS", "WMSTime" -> "WMS";
+          case "WMTS" -> "WMTS";
+          // AFAICT these two don't exist yet and might be replaced with the proper value once implemented
+          case "WFS" -> "WFS";
+          case "XYZ" -> "XYZ";
+          default -> {
+              log.warn("Unable to migrate layer of type {}.", type);
+              yield null;
+          }
+      };
   }
 
-  private static void migrateClientConfig(JsonNode node, ObjectNode config) {
+  private static void migrateLayerClientConfig(JsonNode node, ObjectNode config) {
     ObjectMapper mapper = new ObjectMapper();
     JsonNode appearance = node.get("appearance");
     config.put("minResolution", appearance.get("minResolution").textValue());
@@ -170,7 +163,12 @@ public class Shogun2Migrator implements ShogunMigrator {
       properties.put("title", node.get("name").asText());
       ArrayNode list = mapper.createArrayNode();
       properties.set("children", list);
-      propertyConfig.fieldNames().forEachRemaining(name -> {
+
+      List<String> propertyList = new ArrayList<>();
+      propertyConfig.fieldNames().forEachRemaining(propertyList::add);
+      Collections.reverse(propertyList);
+
+      propertyList.forEach(name -> {
         ObjectNode property = mapper.createObjectNode();
         property.put("propertyName", name);
         property.put("displayName", propertyConfig.get(name).asText());
@@ -196,7 +194,7 @@ public class Shogun2Migrator implements ShogunMigrator {
     }
   }
 
-  private static void migrateSourceConfig(JsonNode node, ObjectNode config) {
+  private static void migrateLayerSourceConfig(JsonNode node, ObjectNode config) {
     config.put("attribution", node.get("appearance").get("attribution").textValue());
     JsonNode legendUrl = node.get("legendUrl");
     if (legendUrl != null) {
@@ -246,8 +244,8 @@ public class Shogun2Migrator implements ShogunMigrator {
     ObjectNode clientConfig = mapper.createObjectNode();
     ObjectNode sourceConfig = mapper.createObjectNode();
 
-    migrateClientConfig(node, clientConfig);
-    migrateSourceConfig(node, sourceConfig);
+    migrateLayerClientConfig(node, clientConfig);
+    migrateLayerSourceConfig(node, sourceConfig);
 
     root.set("clientConfig", clientConfig);
     root.set("sourceConfig", sourceConfig);
