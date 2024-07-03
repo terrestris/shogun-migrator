@@ -4,14 +4,14 @@
 
   <groupId>de.terrestris</groupId>
   <artifactId>shogun-migrator</artifactId>
-  <version>1.1.1-SNAPSHOT</version>
+  <version>1.1.1</version>
   <packaging>jar</packaging>
 
   <scm>
     <url>https://github.com/terrestris/shogun-migrator</url>
     <connection>scm:git:git@github.com:terrestris/shogun-migrator.git</connection>
     <developerConnection>scm:git:git@github.com:terrestris/shogun-migrator.git</developerConnection>
-    <tag>HEAD</tag>
+    <tag>v1.1.1</tag>
   </scm>
 
   <repositories>
