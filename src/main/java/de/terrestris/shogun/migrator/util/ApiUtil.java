@@ -155,6 +155,21 @@ public class ApiUtil {
     return result.get("id").intValue();
   }
 
+  public static void makeLayerPublic(HostDto host, int id) throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException, IOException {
+    HttpPost post = new HttpPost(String.format("%slayers/%s/permissions/public", host.getHostname(), id));
+    try (CloseableHttpClient client = HttpClients.custom()
+      .setSSLContext(new SSLContextBuilder().loadTrustMaterial(null, TrustAllStrategy.INSTANCE).build())
+      .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+      .build()) {
+      post.addHeader("Authorization", "Bearer " + host.getToken());
+      try (CloseableHttpResponse response = client.execute(post)) {
+        if (response.getStatusLine().getStatusCode() != 200) {
+          log.warn("Unable to make layer public.");
+        }
+      }
+    }
+  }
+
   public static void saveApplication(byte[] bs, HostDto host)
     throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException, IOException {
     ObjectMapper mapper = new ObjectMapper();

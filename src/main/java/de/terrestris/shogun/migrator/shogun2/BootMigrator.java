@@ -64,7 +64,7 @@ public class BootMigrator implements ShogunMigrator {
   }
 
   @Override
-  public Map<Integer, Integer> migrateLayers() {
+  public Map<Integer, Integer> migrateLayers(boolean makePublic) {
     ObjectMapper mapper = new ObjectMapper();
     try {
       JsonNode node = fetch(source, "layers", true);
@@ -80,6 +80,9 @@ public class BootMigrator implements ShogunMigrator {
           continue;
         }
         int newId = saveLayer(bs, target);
+        if (makePublic) {
+          makeLayerPublic(target, newId);
+        }
         layerIdMap.put(id, newId);
       }
       return layerIdMap;
