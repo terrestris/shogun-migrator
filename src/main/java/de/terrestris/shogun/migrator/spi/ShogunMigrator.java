@@ -19,7 +19,7 @@ public interface ShogunMigrator {
    *
    * @return a map mapping the old ids to the new ids
    */
-  Map<Integer, Integer> migrateLayers();
+  Map<Integer, Integer> migrateLayers(boolean makePublic);
 
   /**
    * Migrate the applications.

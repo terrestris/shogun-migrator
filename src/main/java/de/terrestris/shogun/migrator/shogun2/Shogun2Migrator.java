@@ -262,7 +262,7 @@ public class Shogun2Migrator implements ShogunMigrator {
   }
 
   @Override
-  public Map<Integer, Integer> migrateLayers() {
+  public Map<Integer, Integer> migrateLayers(boolean makePublic) {
     try {
       JsonNode node = fetch(source, "rest/projectlayers", false);
       Map<Integer, Integer> layerIdMap = new HashMap<>();
@@ -274,6 +274,9 @@ public class Shogun2Migrator implements ShogunMigrator {
           continue;
         }
         int newId = saveLayer(bs, target);
+        if (makePublic) {
+          makeLayerPublic(target, newId);
+        }
         layerIdMap.put(layer.get("id").intValue(), newId);
         // use these to create new test files
 //        new ObjectMapper().writeValue(new File("/tmp/layer" + ++i + ".json"), layer);

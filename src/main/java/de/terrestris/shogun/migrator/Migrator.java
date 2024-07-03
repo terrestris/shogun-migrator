@@ -24,6 +24,12 @@ public class Migrator implements Callable<Boolean> {
   enum Type { shogun2, boot }
 
   @Option(
+    names = {"-p", "--public"},
+    description = "if true, layers will be made public, default is false"
+  )
+  private boolean layersPublic = false;
+
+  @Option(
     names = {"-t", "--type"},
     description = "specify the type of the source (${COMPLETION-CANDIDATES}), default is shogun2. Note that other types may be added via plugins"
   )
@@ -136,7 +142,7 @@ public class Migrator implements Callable<Boolean> {
       log.info("Done.");
     }
     migrator.initialize(source, target);
-    migrator.migrateApplications(migrator.migrateLayers());
+    migrator.migrateApplications(migrator.migrateLayers(layersPublic));
     return true;
   }
 
