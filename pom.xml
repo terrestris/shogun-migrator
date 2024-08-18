@@ -52,7 +52,7 @@
     <sonar.host.url>https://sq.terrestris.de</sonar.host.url>
     <sonar.login>terrestris</sonar.login>
     <sonar.sources>src/main/</sonar.sources>
-    <junit-jupiter.version>5.10.3</junit-jupiter.version>
+    <junit-jupiter.version>5.11.0</junit-jupiter.version>
     <geotools.version>31.3</geotools.version>
   </properties>
 
