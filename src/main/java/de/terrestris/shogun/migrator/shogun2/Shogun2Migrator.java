@@ -208,7 +208,19 @@ public class Shogun2Migrator implements ShogunMigrator {
     } else {
       config.put("url", "/geoserver/ows");
     }
-    config.put("layerNames", oldSource.get("layerNames").textValue());
+    final JsonNode layerNames = oldSource.get("layerNames");
+    if (layerNames != null) {
+      config.put("layerNames", layerNames.textValue());
+    } else {
+      // check whether we have a wmtsLayer config
+      final JsonNode wmtsLayer = oldSource.get("wmtsLayer");
+      if(wmtsLayer != null) {
+        config.put("layerNames", wmtsLayer.textValue());
+      } else {
+        config.put("layerNames", "");
+      }
+
+    }
     JsonNode tileGrid = oldSource.get("tileGrid");
     if (tileGrid != null) {
       config.put("tileSize", tileGrid.get("tileSize").intValue());
