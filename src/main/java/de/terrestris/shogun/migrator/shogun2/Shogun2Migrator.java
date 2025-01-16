@@ -98,23 +98,36 @@ public class Shogun2Migrator implements ShogunMigrator {
       mapView.set("center", center);
       ArrayNode extent = mapper.createArrayNode();
       JsonNode oldExtent = mapConfig.get("extent");
-      extent.add(oldExtent.get("lowerLeft").get("x").asDouble());
-      extent.add(oldExtent.get("lowerLeft").get("y").asDouble());
-      extent.add(oldExtent.get("upperRight").get("x").asDouble());
-      extent.add(oldExtent.get("upperRight").get("y").asDouble());
-      mapView.set("extent", extent);
-      mapView.put("zoom", mapConfig.get("zoom").asInt());
+
       String oldProjection = mapConfig.get("projection").asText();
       mapView.put("projection", oldProjection.startsWith("EPSG:") ? oldProjection : ("EPSG:" + oldProjection));
 
       CoordinateReferenceSystem targetCrs = CRS.decode("EPSG:4326");
       CoordinateReferenceSystem sourceCrs = CRS.decode(mapView.get("projection").asText());
       MathTransform transform = CRS.findMathTransform(sourceCrs, targetCrs);
-      Position pos = new Position2D(center.get(0).asDouble(), center.get(1).asDouble());
-      Position transformed = transform.transform(pos, null);
+
+      final double lowerLeftX = oldExtent.get("lowerLeft").get("x").asDouble();
+      final double lowerLeftY = oldExtent.get("lowerLeft").get("y").asDouble();
+      Position lowerLeftPos = new Position2D(lowerLeftX, lowerLeftY);
+      Position transformedLowerLeftPos = transform.transform(lowerLeftPos, null);
+      extent.add(transformedLowerLeftPos.getOrdinate(1));
+      extent.add(transformedLowerLeftPos.getOrdinate(0));
+
+      final double upperRightX = oldExtent.get("upperRight").get("x").asDouble();
+      final double upperRightY = oldExtent.get("upperRight").get("y").asDouble();
+      Position upperRightPos = new Position2D(upperRightX, upperRightY);
+      Position transformedUpperRightPos = transform.transform(upperRightPos, null);
+      extent.add(transformedUpperRightPos.getOrdinate(1));
+      extent.add(transformedUpperRightPos.getOrdinate(0));
+
+      mapView.set("extent", extent);
+      mapView.put("zoom", mapConfig.get("zoom").asInt());
+
+      Position centerPos = new Position2D(center.get(0).asDouble(), center.get(1).asDouble());
+      Position transformedCenterPos = transform.transform(centerPos, null);
       center.removeAll();
-      center.add(transformed.getOrdinate(1));
-      center.add(transformed.getOrdinate(0));
+      center.add(transformedCenterPos.getOrdinate(1));
+      center.add(transformedCenterPos.getOrdinate(0));
 
       JsonNode resolutions = mapConfig.get(RESOLUTIONS);
       ArrayNode newResolutions = mapper.createArrayNode();
