@@ -25,3 +25,7 @@ You can run the application directly or in an IDE. Run with `-h` to get help:
 | `tp`      | Target password               |
 | `tc`      | Target client                 |
 | `c`       | Clear (override existing data)|
+
+## Reset the hibernate sequence
+
+To reset the hibernate sequence, use something like `alter sequence hibernate_sequence restart with 100;`
