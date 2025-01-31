@@ -1,6 +1,7 @@
 package de.terrestris.shogun.migrator.spi;
 
 import de.terrestris.shogun.migrator.model.HostDto;
+import de.terrestris.shogun.migrator.model.Legal;
 
 import java.util.Map;
 
@@ -25,8 +26,9 @@ public interface ShogunMigrator {
    * Migrate the applications.
    *
    * @param idMap a map mapping the old layer ids to the new ids
+   * @param legal The legal information (http links) to set in all clients
    */
-  void migrateApplications(Map<Integer, Integer> idMap);
+  void migrateApplications(Map<Integer, Integer> idMap, Legal legal);
 
   /**
    * SPI: returns true if this migrator can handle the specified source API type.

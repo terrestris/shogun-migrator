@@ -21,7 +21,7 @@ class MigratorTest {
     @ValueSource(strings = {"/1.json", "/2.json", "/3.json"})
     void testMigration(String file) throws IOException, FactoryException, TransformException {
         JsonNode node = mapper.readTree(MigratorTest.class.getResource(file));
-        byte[] bs = Shogun2Migrator.migrateApplication(node, new HashMap<>());
+        byte[] bs = Shogun2Migrator.migrateApplication(node, new HashMap<>(), null);
         byte[] expected = IOUtils.toByteArray(MigratorTest.class.getResource("/migrated" + file));
         Assertions.assertArrayEquals(expected, bs);
     }

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.terrestris.shogun.migrator.model.HostDto;
+import de.terrestris.shogun.migrator.model.Legal;
 import de.terrestris.shogun.migrator.spi.ShogunMigrator;
 import de.terrestris.shogun.migrator.util.MigrationException;
 import lombok.extern.log4j.Log4j2;
@@ -94,7 +95,7 @@ public class BootMigrator implements ShogunMigrator {
   }
 
   @Override
-  public void migrateApplications(Map<Integer, Integer> idMap) {
+  public void migrateApplications(Map<Integer, Integer> idMap, Legal legal) {
     try {
       JsonNode node = fetch(source, "applications", true);
       for (JsonNode app : node) {
