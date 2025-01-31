@@ -168,7 +168,7 @@ public class Shogun2Migrator implements ShogunMigrator {
     config.put("maxResolution", appearance.get("maxResolution").textValue());
     config.put("hoverable", appearance.get("hoverable").booleanValue());
     JsonNode propertyConfig = node.get("columnAliasesDe");
-    if (propertyConfig != null) {
+    if (propertyConfig != null && !propertyConfig.isEmpty()) {
       ArrayNode formConfig = mapper.createArrayNode();
       config.set("featureInfoFormConfig", formConfig);
       ObjectNode properties = mapper.createObjectNode();
