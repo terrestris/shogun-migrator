@@ -9,6 +9,7 @@ import de.terrestris.shogun.migrator.model.Legal;
 import de.terrestris.shogun.migrator.spi.ShogunMigrator;
 import de.terrestris.shogun.migrator.util.MigrationException;
 import lombok.extern.log4j.Log4j2;
+import org.apache.commons.lang3.StringUtils;
 import org.geotools.api.geometry.Position;
 import org.geotools.api.referencing.FactoryException;
 import org.geotools.api.referencing.crs.CoordinateReferenceSystem;
@@ -31,6 +32,8 @@ public class Shogun2Migrator implements ShogunMigrator {
   public static final String CHILDREN = "children";
   public static final String RESOLUTIONS = "resolutions";
   public static final String SEARCHABLE = "searchable";
+  public static final String DOUBLE_COLON = "::";
+  public static final String COMMA = ",";
   private HostDto source;
 
   private HostDto target;
@@ -227,7 +230,7 @@ public class Shogun2Migrator implements ShogunMigrator {
     }
   }
 
-  private static void migrateLayerSourceConfig(JsonNode node, ObjectNode config) {
+  private static void migrateLayerSourceConfig(JsonNode node, ObjectNode config, String replaceLayerUrls) {
     config.put("attribution", node.get("appearance").get("attribution").textValue());
     JsonNode legendUrl = node.get("legendUrl");
     if (legendUrl != null) {
@@ -236,6 +239,20 @@ public class Shogun2Migrator implements ShogunMigrator {
     ObjectMapper mapper = new ObjectMapper();
     JsonNode oldSource = node.get("source");
     String url = oldSource.get("url").textValue();
+
+    if (replaceLayerUrls != null && replaceLayerUrls.contains(DOUBLE_COLON)) {
+      String[] replacements = replaceLayerUrls.split(COMMA);
+      for (String replacement : replacements) {
+        if (replacement.contains(DOUBLE_COLON)) {
+          String[] replacementSplit =  replacement.split(DOUBLE_COLON);
+          if (replacementSplit[0].equals(url)) {
+            url = replacementSplit[1];
+            break;
+          }
+        }
+      }
+    }
+
     if (url.startsWith("http")) {
       config.put("url", url);
     } else {
@@ -269,7 +286,7 @@ public class Shogun2Migrator implements ShogunMigrator {
     }
   }
 
-  public static byte[] migrateLayer(JsonNode node) throws IOException {
+  public static byte[] migrateLayer(JsonNode node, String replaceLayerUrl) throws IOException {
     ObjectMapper mapper = new ObjectMapper();
     ObjectNode root = mapper.createObjectNode();
 
@@ -290,7 +307,7 @@ public class Shogun2Migrator implements ShogunMigrator {
     ObjectNode sourceConfig = mapper.createObjectNode();
 
     migrateLayerClientConfig(node, clientConfig);
-    migrateLayerSourceConfig(node, sourceConfig);
+    migrateLayerSourceConfig(node, sourceConfig, replaceLayerUrl);
 
     root.set("clientConfig", clientConfig);
     root.set("sourceConfig", sourceConfig);
@@ -307,14 +324,14 @@ public class Shogun2Migrator implements ShogunMigrator {
   }
 
   @Override
-  public Map<Integer, Integer> migrateLayers(boolean makePublic) {
+  public Map<Integer, Integer> migrateLayers(boolean makePublic, String replaceLayerUrls) {
     try {
       JsonNode node = fetch(source, "rest/projectlayers", false);
       Map<Integer, Integer> layerIdMap = new HashMap<>();
 //      int i = 0;
       for (JsonNode layer : node) {
         log.info("Migrating layer...");
-        byte[] bs = migrateLayer(layer);
+        byte[] bs = migrateLayer(layer, replaceLayerUrls);
         if (bs == null) {
           continue;
         }
