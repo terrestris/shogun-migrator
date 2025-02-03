@@ -2,6 +2,7 @@ package de.terrestris.shogun.migrator;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import de.terrestris.shogun.migrator.model.HostDto;
+import de.terrestris.shogun.migrator.model.Legal;
 import de.terrestris.shogun.migrator.spi.ShogunMigrator;
 import lombok.extern.log4j.Log4j2;
 import picocli.CommandLine;
@@ -96,6 +97,24 @@ public class Migrator implements Callable<Boolean> {
   )
   private String targetClient;
 
+  @Option(
+    names = {"-co", "--contact"},
+    description = "the legal contact http link to set in all new applications"
+  )
+  private String contact = null;
+
+  @Option(
+    names = {"-im", "--imprint"},
+    description = "the legal imprint http link to set in all new applications"
+  )
+  private String imprint = null;
+
+  @Option(
+    names = {"-pr", "--privacy"},
+    description = "the legal privacy http link to set in all new applications"
+  )
+  private String privacy = null;
+
   private static ShogunMigrator getMigrator(Type type) {
     ServiceLoader<ShogunMigrator> loader = ServiceLoader.load(ShogunMigrator.class);
     for (ShogunMigrator migrator : loader) {
@@ -142,7 +161,8 @@ public class Migrator implements Callable<Boolean> {
       log.info("Done.");
     }
     migrator.initialize(source, target);
-    migrator.migrateApplications(migrator.migrateLayers(layersPublic));
+    Legal legal = new Legal(contact, imprint, privacy);
+    migrator.migrateApplications(migrator.migrateLayers(layersPublic), legal);
     return true;
   }
 

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.terrestris.shogun.migrator.model.HostDto;
+import de.terrestris.shogun.migrator.model.Legal;
 import de.terrestris.shogun.migrator.spi.ShogunMigrator;
 import de.terrestris.shogun.migrator.util.MigrationException;
 import lombok.extern.log4j.Log4j2;
@@ -76,7 +77,7 @@ public class Shogun2Migrator implements ShogunMigrator {
     return folder;
   }
 
-  public static byte[] migrateApplication(JsonNode node, Map<Integer, Integer> idMap) throws IOException, FactoryException, TransformException {
+  public static byte[] migrateApplication(JsonNode node, Map<Integer, Integer> idMap, Legal legal) throws IOException, FactoryException, TransformException {
     ObjectMapper mapper = new ObjectMapper();
     ObjectNode root = mapper.createObjectNode();
     ObjectNode clientConfig = mapper.createObjectNode();
@@ -136,6 +137,25 @@ public class Shogun2Migrator implements ShogunMigrator {
       }
       mapView.set(RESOLUTIONS, newResolutions);
       clientConfig.set("mapView", mapView);
+    }
+    // set legal info for all apps
+    if (legal != null) {
+      final String contact = legal.getContact();
+      final String imprint = legal.getImprint();
+      final String privacy = legal.getPrivacy();
+      if (contact != null || imprint != null || privacy != null) {
+        ObjectNode legalNode = mapper.createObjectNode();
+        if (contact != null && !contact.isEmpty()) {
+          legalNode.put("contact", contact);
+        }
+        if (imprint != null && !imprint.isEmpty()) {
+          legalNode.put("imprint", imprint);
+        }
+        if (privacy != null && !privacy.isEmpty()) {
+          legalNode.put("privacy", privacy);
+        }
+        clientConfig.set("legal", legalNode);
+      }
     }
     JsonNode layerTree = migrateLayerTree(node.get("layerTree"), mapper, idMap);
     root.set("layerTree", layerTree);
@@ -318,13 +338,13 @@ public class Shogun2Migrator implements ShogunMigrator {
   }
 
   @Override
-  public void migrateApplications(Map<Integer, Integer> idMap) {
+  public void migrateApplications(Map<Integer, Integer> idMap, Legal legal) {
     try {
       JsonNode node = fetch(source, "rest/projectapps", false);
 //      int i = 0;
       for (JsonNode app : node) {
         log.info("Migrating application...");
-        byte[] bs = migrateApplication(app, idMap);
+        byte[] bs = migrateApplication(app, idMap, legal);
         saveApplication(bs, target);
         // use these to create new test files
 //        OutputStream outputStream = Files.newOutputStream(new File("/tmp/" + ++i + ".json").toPath());
