@@ -6,10 +6,10 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.terrestris.shogun.migrator.model.HostDto;
 import de.terrestris.shogun.migrator.model.Legal;
+import de.terrestris.shogun.migrator.model.Theme;
 import de.terrestris.shogun.migrator.spi.ShogunMigrator;
 import de.terrestris.shogun.migrator.util.MigrationException;
 import lombok.extern.log4j.Log4j2;
-import org.apache.commons.lang3.StringUtils;
 import org.geotools.api.geometry.Position;
 import org.geotools.api.referencing.FactoryException;
 import org.geotools.api.referencing.crs.CoordinateReferenceSystem;
@@ -80,7 +80,7 @@ public class Shogun2Migrator implements ShogunMigrator {
     return folder;
   }
 
-  public static byte[] migrateApplication(JsonNode node, Map<Integer, Integer> idMap, Legal legal) throws IOException, FactoryException, TransformException {
+  public static byte[] migrateApplication(JsonNode node, Map<Integer, Integer> idMap, Legal legal, Theme theme) throws IOException, FactoryException, TransformException {
     ObjectMapper mapper = new ObjectMapper();
     ObjectNode root = mapper.createObjectNode();
     ObjectNode clientConfig = mapper.createObjectNode();
@@ -148,16 +148,31 @@ public class Shogun2Migrator implements ShogunMigrator {
       final String privacy = legal.getPrivacy();
       if (contact != null || imprint != null || privacy != null) {
         ObjectNode legalNode = mapper.createObjectNode();
-        if (contact != null && !contact.isEmpty()) {
-          legalNode.put("contact", contact);
-        }
-        if (imprint != null && !imprint.isEmpty()) {
-          legalNode.put("imprint", imprint);
-        }
-        if (privacy != null && !privacy.isEmpty()) {
-          legalNode.put("privacy", privacy);
-        }
+
+        addToNode(contact, "contact", legalNode);
+        addToNode(imprint, "imprint", legalNode);
+        addToNode(privacy, "privacy", legalNode);
+
         clientConfig.set("legal", legalNode);
+      }
+    }
+    // set theme info for all apps
+    if (theme != null) {
+      final String primaryColor = theme.getPrimaryColor();
+      final String secondaryColor = theme.getSecondaryColor();
+      final String complementaryColor = theme.getComplementaryColor();
+      final String logoPath = theme.getLogoPath();
+      final String faviconPath = theme.getFaviconPath();
+      if (primaryColor != null || secondaryColor != null || complementaryColor != null || logoPath != null || faviconPath != null) {
+        ObjectNode themeNode = mapper.createObjectNode();
+
+        addToNode(primaryColor, "primaryColor", themeNode);
+        addToNode(secondaryColor, "secondaryColor", themeNode);
+        addToNode(complementaryColor, "complementaryColor", themeNode);
+        addToNode(logoPath, "logoPath", themeNode);
+        addToNode(faviconPath, "faviconPath", themeNode);
+
+        clientConfig.set("theme", themeNode);
       }
     }
     JsonNode layerTree = migrateLayerTree(node.get("layerTree"), mapper, idMap);
@@ -166,6 +181,12 @@ public class Shogun2Migrator implements ShogunMigrator {
     ByteArrayOutputStream bout = new ByteArrayOutputStream();
     mapper.writeValue(bout, root);
     return bout.toByteArray();
+  }
+
+  private static void addToNode(String obj, String fieldName, ObjectNode themeNode) {
+    if (obj != null && !obj.isEmpty()) {
+      themeNode.put(fieldName, obj);
+    }
   }
 
   private static String mapType(String type) {
@@ -355,13 +376,13 @@ public class Shogun2Migrator implements ShogunMigrator {
   }
 
   @Override
-  public void migrateApplications(Map<Integer, Integer> idMap, Legal legal) {
+  public void migrateApplications(Map<Integer, Integer> idMap, Legal legal, Theme theme) {
     try {
       JsonNode node = fetch(source, "rest/projectapps", false);
 //      int i = 0;
       for (JsonNode app : node) {
         log.info("Migrating application...");
-        byte[] bs = migrateApplication(app, idMap, legal);
+        byte[] bs = migrateApplication(app, idMap, legal, theme);
         saveApplication(bs, target);
         // use these to create new test files
 //        OutputStream outputStream = Files.newOutputStream(new File("/tmp/" + ++i + ".json").toPath());
