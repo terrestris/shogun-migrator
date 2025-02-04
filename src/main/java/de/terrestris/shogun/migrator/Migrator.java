@@ -115,6 +115,12 @@ public class Migrator implements Callable<Boolean> {
   )
   private String privacy = null;
 
+  @Option(
+    names = {"-rlu", "--replace-layer-url"},
+    description = "a string 'AAA::BBB,CCC::DDD' defining replacements of 'AAA' with 'BBB' and 'CCC' with 'DDD' for layer source URLs. more replacements can be added by separating with a comma"
+  )
+  private String replaceLayerUrls = null;
+
   private static ShogunMigrator getMigrator(Type type) {
     ServiceLoader<ShogunMigrator> loader = ServiceLoader.load(ShogunMigrator.class);
     for (ShogunMigrator migrator : loader) {
@@ -162,7 +168,7 @@ public class Migrator implements Callable<Boolean> {
     }
     migrator.initialize(source, target);
     Legal legal = new Legal(contact, imprint, privacy);
-    migrator.migrateApplications(migrator.migrateLayers(layersPublic), legal);
+    migrator.migrateApplications(migrator.migrateLayers(layersPublic, replaceLayerUrls), legal);
     return true;
   }
 

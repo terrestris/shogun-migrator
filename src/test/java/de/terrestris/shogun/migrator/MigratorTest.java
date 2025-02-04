@@ -30,7 +30,7 @@ class MigratorTest {
     @ValueSource(strings = {"/layer1.json", "/layer2.json", "/layer3.json", "/layer4.json", "/layer5.json", "/layer6.json", "/layer7.json", "/layer8.json"})
     void testLayerMigration(String file) throws IOException {
         JsonNode node = mapper.readTree(MigratorTest.class.getResource(file));
-        byte[] bs = Shogun2Migrator.migrateLayer(node);
+        byte[] bs = Shogun2Migrator.migrateLayer(node, null);
         byte[] expected = IOUtils.toByteArray(MigratorTest.class.getResource("/migratedlayer" + file));
         Assertions.assertArrayEquals(expected, bs);
     }

@@ -65,7 +65,7 @@ public class BootMigrator implements ShogunMigrator {
   }
 
   @Override
-  public Map<Integer, Integer> migrateLayers(boolean makePublic) {
+  public Map<Integer, Integer> migrateLayers(boolean makePublic, String replaceLayerUrls) {
     ObjectMapper mapper = new ObjectMapper();
     try {
       JsonNode node = fetch(source, "layers", true);
