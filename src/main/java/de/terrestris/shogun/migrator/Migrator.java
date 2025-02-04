@@ -3,6 +3,7 @@ package de.terrestris.shogun.migrator;
 import com.fasterxml.jackson.databind.JsonNode;
 import de.terrestris.shogun.migrator.model.HostDto;
 import de.terrestris.shogun.migrator.model.Legal;
+import de.terrestris.shogun.migrator.model.Theme;
 import de.terrestris.shogun.migrator.spi.ShogunMigrator;
 import lombok.extern.log4j.Log4j2;
 import picocli.CommandLine;
@@ -121,6 +122,36 @@ public class Migrator implements Callable<Boolean> {
   )
   private String replaceLayerUrls = null;
 
+  @Option(
+    names = {"-pco", "--primary-color"},
+    description = "the primary color for the app client config theme"
+  )
+  private String primaryColor = null;
+
+  @Option(
+    names = {"-sco", "--secondary-color"},
+    description = "the secondary color for the app client config theme"
+  )
+  private String secondaryColor = null;
+
+  @Option(
+    names = {"-cco", "--complementary-color"},
+    description = "the complementary color for the app client config theme"
+  )
+  private String complementaryColor = null;
+
+  @Option(
+    names = {"-lp", "--logo-path"},
+    description = "the logo path for the app client config theme"
+  )
+  private String logoPath = null;
+
+  @Option(
+    names = {"-fp", "--favicon-path"},
+    description = "the favicon path for the app client config theme"
+  )
+  private String faviconPath = null;
+
   private static ShogunMigrator getMigrator(Type type) {
     ServiceLoader<ShogunMigrator> loader = ServiceLoader.load(ShogunMigrator.class);
     for (ShogunMigrator migrator : loader) {
@@ -168,7 +199,8 @@ public class Migrator implements Callable<Boolean> {
     }
     migrator.initialize(source, target);
     Legal legal = new Legal(contact, imprint, privacy);
-    migrator.migrateApplications(migrator.migrateLayers(layersPublic, replaceLayerUrls), legal);
+    Theme theme = new Theme(primaryColor, secondaryColor, complementaryColor, logoPath, faviconPath);
+    migrator.migrateApplications(migrator.migrateLayers(layersPublic, replaceLayerUrls), legal, theme);
     return true;
   }
 
