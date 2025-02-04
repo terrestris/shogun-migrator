@@ -148,15 +148,11 @@ public class Shogun2Migrator implements ShogunMigrator {
       final String privacy = legal.getPrivacy();
       if (contact != null || imprint != null || privacy != null) {
         ObjectNode legalNode = mapper.createObjectNode();
-        if (contact != null && !contact.isEmpty()) {
-          legalNode.put("contact", contact);
-        }
-        if (imprint != null && !imprint.isEmpty()) {
-          legalNode.put("imprint", imprint);
-        }
-        if (privacy != null && !privacy.isEmpty()) {
-          legalNode.put("privacy", privacy);
-        }
+
+        addToNode(contact, "contact", legalNode);
+        addToNode(imprint, "imprint", legalNode);
+        addToNode(privacy, "privacy", legalNode);
+
         clientConfig.set("legal", legalNode);
       }
     }
@@ -169,21 +165,13 @@ public class Shogun2Migrator implements ShogunMigrator {
       final String faviconPath = theme.getFaviconPath();
       if (primaryColor != null || secondaryColor != null || complementaryColor != null || logoPath != null || faviconPath != null) {
         ObjectNode themeNode = mapper.createObjectNode();
-        if (primaryColor != null && !primaryColor.isEmpty()) {
-          themeNode.put("primaryColor", primaryColor);
-        }
-        if (secondaryColor != null && !secondaryColor.isEmpty()) {
-          themeNode.put("secondaryColor", secondaryColor);
-        }
-        if (complementaryColor != null && !complementaryColor.isEmpty()) {
-          themeNode.put("complementaryColor", complementaryColor);
-        }
-        if (logoPath != null && !logoPath.isEmpty()) {
-          themeNode.put("logoPath", logoPath);
-        }
-        if (faviconPath != null && !faviconPath.isEmpty()) {
-          themeNode.put("faviconPath", faviconPath);
-        }
+
+        addToNode(primaryColor, "primaryColor", themeNode);
+        addToNode(secondaryColor, "secondaryColor", themeNode);
+        addToNode(complementaryColor, "complementaryColor", themeNode);
+        addToNode(logoPath, "logoPath", themeNode);
+        addToNode(faviconPath, "faviconPath", themeNode);
+
         clientConfig.set("theme", themeNode);
       }
     }
@@ -193,6 +181,12 @@ public class Shogun2Migrator implements ShogunMigrator {
     ByteArrayOutputStream bout = new ByteArrayOutputStream();
     mapper.writeValue(bout, root);
     return bout.toByteArray();
+  }
+
+  private static void addToNode(String obj, String fieldName, ObjectNode themeNode) {
+    if (obj != null && !obj.isEmpty()) {
+      themeNode.put(fieldName, obj);
+    }
   }
 
   private static String mapType(String type) {
