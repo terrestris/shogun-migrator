@@ -20,6 +20,7 @@ import org.geotools.referencing.CRS;
 import org.kohsuke.MetaInfServices;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
@@ -80,7 +81,7 @@ public class Shogun2Migrator implements ShogunMigrator {
     return folder;
   }
 
-  public static byte[] migrateApplication(JsonNode node, Map<Integer, Integer> idMap, Legal legal, Theme theme) throws IOException, FactoryException, TransformException {
+  public static byte[] migrateApplication(JsonNode node, Map<Integer, Integer> idMap, Legal legal, Theme theme, String toolConfigFile) throws IOException, FactoryException, TransformException {
     ObjectMapper mapper = new ObjectMapper();
     ObjectNode root = mapper.createObjectNode();
     ObjectNode clientConfig = mapper.createObjectNode();
@@ -175,6 +176,12 @@ public class Shogun2Migrator implements ShogunMigrator {
         clientConfig.set("theme", themeNode);
       }
     }
+
+    // read tool config from file
+    if(toolConfigFile != null && !toolConfigFile.isEmpty()) {
+      root.set("toolConfig", mapper.readTree(new File(toolConfigFile)));
+    }
+
     JsonNode layerTree = migrateLayerTree(node.get("layerTree"), mapper, idMap);
     root.set("layerTree", layerTree);
     root.set("clientConfig", clientConfig);
@@ -376,13 +383,13 @@ public class Shogun2Migrator implements ShogunMigrator {
   }
 
   @Override
-  public void migrateApplications(Map<Integer, Integer> idMap, Legal legal, Theme theme) {
+  public void migrateApplications(Map<Integer, Integer> idMap, Legal legal, Theme theme, String toolConfigFile) {
     try {
       JsonNode node = fetch(source, "rest/projectapps", false);
 //      int i = 0;
       for (JsonNode app : node) {
         log.info("Migrating application...");
-        byte[] bs = migrateApplication(app, idMap, legal, theme);
+        byte[] bs = migrateApplication(app, idMap, legal, theme, toolConfigFile);
         saveApplication(bs, target);
         // use these to create new test files
 //        OutputStream outputStream = Files.newOutputStream(new File("/tmp/" + ++i + ".json").toPath());

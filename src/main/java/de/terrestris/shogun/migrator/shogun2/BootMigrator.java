@@ -96,7 +96,7 @@ public class BootMigrator implements ShogunMigrator {
   }
 
   @Override
-  public void migrateApplications(Map<Integer, Integer> idMap, Legal legal, Theme theme) {
+  public void migrateApplications(Map<Integer, Integer> idMap, Legal legal, Theme theme, String toolConfigFile) {
     try {
       JsonNode node = fetch(source, "applications", true);
       for (JsonNode app : node) {
