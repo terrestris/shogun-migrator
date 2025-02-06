@@ -152,6 +152,12 @@ public class Migrator implements Callable<Boolean> {
   )
   private String faviconPath = null;
 
+  @Option(
+    names = {"-tcf", "--tool-config-file"},
+    description = "a path to a json file that will be used as the tool config for all new apps. You can try the example file with --tool-config-file=src/main/resources/toolConfig.json"
+  )
+  private String toolConfigFile = null;
+
   private static ShogunMigrator getMigrator(Type type) {
     ServiceLoader<ShogunMigrator> loader = ServiceLoader.load(ShogunMigrator.class);
     for (ShogunMigrator migrator : loader) {
@@ -200,7 +206,7 @@ public class Migrator implements Callable<Boolean> {
     migrator.initialize(source, target);
     Legal legal = new Legal(contact, imprint, privacy);
     Theme theme = new Theme(primaryColor, secondaryColor, complementaryColor, logoPath, faviconPath);
-    migrator.migrateApplications(migrator.migrateLayers(layersPublic, replaceLayerUrls), legal, theme);
+    migrator.migrateApplications(migrator.migrateLayers(layersPublic, replaceLayerUrls), legal, theme, toolConfigFile);
     return true;
   }
 
