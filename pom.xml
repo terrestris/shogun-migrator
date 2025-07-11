@@ -50,7 +50,6 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <sonar.host.url>https://sq.terrestris.de</sonar.host.url>
-    <sonar.login>terrestris</sonar.login>
     <sonar.sources>src/main/</sonar.sources>
     <junit-jupiter.version>5.11.4</junit-jupiter.version>
     <geotools.version>32.2</geotools.version>
