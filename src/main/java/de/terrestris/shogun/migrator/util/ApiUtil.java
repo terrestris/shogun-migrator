@@ -107,7 +107,11 @@ public class ApiUtil {
       CloseableHttpResponse response = client.execute(get);
       log.debug("Status code: {}", response.getStatusLine().getStatusCode());
 
-      return mapper.readTree(response.getEntity().getContent());
+      var node = mapper.readTree(response.getEntity().getContent());
+      if (isBoot && node.has("content")) {
+        node = node.get("content");
+      }
+      return node;
     }
   }
 

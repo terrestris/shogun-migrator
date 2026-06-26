@@ -169,11 +169,11 @@ public class Migrator implements Callable<Boolean> {
   }
 
   private void clear(HostDto target) throws IOException, KeyStoreException, NoSuchAlgorithmException, KeyManagementException {
-    JsonNode node = fetch(target, "applications", true).get("content");
+    JsonNode node = fetch(target, "applications", true);
     for (JsonNode app : node) {
       delete(target, String.format("applications/%s", app.get("id").asInt()));
     }
-    node = fetch(target, "layers", true).get("content");
+    node = fetch(target, "layers", true);
     for (JsonNode app : node) {
       delete(target, String.format("layers/%s", app.get("id").asInt()));
     }
